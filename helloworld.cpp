@@ -4,17 +4,15 @@
 
 using namespace std;
 
-int main()
-{
+int main(int argc, const char** argv) {
 
-    vector<string> msg {"Hello","C++","World","from","VS Code"};
+    vector<string> msg{"Hello", "C++", "World", "from", "VS Code"};
 
-    for (const string& word:msg)
+    for (const string &word : msg)
     {
         cout << word << " ";
     }
 
     cout << endl;
-
     return 0;
 }
