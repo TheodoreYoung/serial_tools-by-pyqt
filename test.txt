@@ -1,0 +1,6 @@
+V1.0:
+1-Can use git pull origin master
+
+2-now ,we test git push
+
+3-merge and push ;
