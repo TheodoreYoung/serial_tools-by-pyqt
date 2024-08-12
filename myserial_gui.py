@@ -7,7 +7,14 @@ import socket
 import threading
 import sys
 
+class ReceiverSignals(QtCore.QObject):
+    data_received = QtCore.pyqtSignal(str)
+
 class Ui_MainWindow(object):
+    def __init__(self):
+        self.receiver_signals = ReceiverSignals()
+        self.receiver_signals.data_received.connect(self.append_to_receive_text_edit)
+
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(1200, 600)
@@ -125,6 +132,9 @@ class Ui_MainWindow(object):
         self.server_thread = None
         self.client_socket = None
 
+        # 启动串口监听线程
+        self.serial_thread = None
+
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "串口调试助手"))
@@ -150,10 +160,14 @@ class Ui_MainWindow(object):
         baudrate = int(self.comboBox_baudrate.currentText())
 
         try:
-            self.serial = serial.Serial(port, baudrate)
+            self.serial = serial.Serial(port, baudrate, timeout=1)
             self.pushButton_open.setText("关闭串口")
             self.pushButton_open.clicked.disconnect()
             self.pushButton_open.clicked.connect(self.close_serial)
+
+            # 启动串口监听线程
+            self.serial_thread = threading.Thread(target=self.read_serial_data)
+            self.serial_thread.start()
         except Exception as e:
             QtWidgets.QMessageBox.critical(None, "错误", f"无法打开串口: {str(e)}")
 
@@ -183,6 +197,16 @@ class Ui_MainWindow(object):
         else:
             QtWidgets.QMessageBox.warning(None, "警告", "请先打开串口或连接服务器")
 
+    def read_serial_data(self):
+        """读取串口数据"""
+        while True:
+            if self.serial and self.serial.is_open:
+                data = self.serial.read(1024)
+                if data:
+                    self.receiver_signals.data_received.emit(f"接收到数据: {data.decode('gbk')}")
+            else:
+                break
+
     def start_server(self):
         """启动服务器"""
         port = int(self.lineEdit_server_port.text())
@@ -194,16 +218,16 @@ class Ui_MainWindow(object):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server_socket.bind(('0.0.0.0', port))
         server_socket.listen(1)
-        self.textEdit_receive.append("服务器已启动，等待连接...")
+        self.receiver_signals.data_received.emit("服务器已启动，等待连接...")
 
         while True:
             client_socket, addr = server_socket.accept()
-            self.textEdit_receive.append(f"客户端 {addr} 已连接")
+            self.receiver_signals.data_received.emit(f"客户端 {addr} 已连接")
             while True:
                 data = client_socket.recv(1024)
                 if not data:
                     break
-                self.textEdit_receive.append(f"接收到数据: {data.decode('gbk')}")
+                self.receiver_signals.data_received.emit(f"接收到数据: {data.decode('gbk')}")
             client_socket.close()
 
     def start_client(self):
@@ -213,9 +237,24 @@ class Ui_MainWindow(object):
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.client_socket.connect((ip, port))
-            self.textEdit_receive.append("已连接到服务器")
+            self.pushButton_client_start.setText("断开连接")
+            self.pushButton_client_start.clicked.disconnect()
+            self.pushButton_client_start.clicked.connect(self.stop_client)
         except Exception as e:
-            QtWidgets.QMessageBox.critical(None, "错误", f"连接服务器失败: {str(e)}")
+            QtWidgets.QMessageBox.critical(None, "错误", f"连接失败: {str(e)}")
+
+    def stop_client(self):
+        """断开客户端连接"""
+        if self.client_socket:
+            self.client_socket.close()
+            self.client_socket = None
+            self.pushButton_client_start.setText("启动客户端")
+            self.pushButton_client_start.clicked.disconnect()
+            self.pushButton_client_start.clicked.connect(self.start_client)
+
+    def append_to_receive_text_edit(self, message):
+        """在主线程中安全地更新接收文本框"""
+        self.textEdit_receive.append(message)
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
