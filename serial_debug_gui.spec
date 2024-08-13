@@ -5,7 +5,7 @@ a = Analysis(
     ['serial_debug_gui.py'],
     pathex=[],
     binaries=[],
-    datas=[],
+    datas=[('C:\\Users\\Theodore\\.conda\\envs\\upboardenv\\Lib\\site-packages\\PyQt5\\Qt5\\plugins\\platforms', 'platforms')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
